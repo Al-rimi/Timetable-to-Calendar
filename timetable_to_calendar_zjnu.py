@@ -1,17 +1,13 @@
-"""
-PDF timetable → ICS calendar generator
+"""ZJNU PDF timetable → ICS generator
 
-- Input: a PDF file path (CLI arg). If omitted, the script auto-selects the first .pdf in the current folder.
-- Output: an .ics calendar file with events for all detected courses (table + outside courses).
-- Approach: use pdfplumber.extract_tables to reconstruct the main timetable, stitch PDF row-split fragments,
-  parse blocks per the university's marker/type rules (△ ★ ▲ ☆), extract Week/Section/Location/Teacher, and build ICS.
+Reads a timetable PDF (EN/CN), extracts courses, and emits a standards-compliant .ics.
+Inputs: PDF path and week-1 Monday date. Output: .ics next to the PDF.
 """
 
 import os
 import sys
 import glob
 import pdfplumber
-import argparse
 import re
 from datetime import datetime, timedelta, timezone
 try:
@@ -31,7 +27,7 @@ def find_default_pdf() -> str | None:
 
 
 def extract_tables(pdf_path: str, strategy: str = "auto"):
-    all_tables = []  # list of (page_index, table_index, rows)
+    all_tables = []  # (page_index, table_index, rows)
     with pdfplumber.open(pdf_path) as pdf:
         for i, page in enumerate(pdf.pages, start=1):
             tables = []
@@ -56,7 +52,7 @@ def extract_tables(pdf_path: str, strategy: str = "auto"):
     return all_tables
 
 
-# Markdown rendering removed (ICS-only tool)
+# removed: markdown helpers; ICS-only tool
 
 
 def merge_main_table(all_tables, collapse_newlines: bool = True):
@@ -100,7 +96,7 @@ def merge_main_table(all_tables, collapse_newlines: bool = True):
                 return idx
         return None
 
-    # Locate the first table with a recognizable header
+    # Find the first table with recognizable EN/CN header
     main_headers = None
     col_count = None
     merged_rows: list[list[str]] = []
@@ -164,7 +160,7 @@ def merge_main_table(all_tables, collapse_newlines: bool = True):
             rows_to_add = rows
         merged_rows.extend(rows_to_add)
 
-    # Collect optional notes: legend and print time rows
+    # Collect optional notes
     for page_idx, table_idx, rows in cleaned_tables:
         for r in rows or []:
             joined = " ".join([x for x in r if x])
@@ -177,7 +173,7 @@ def merge_main_table(all_tables, collapse_newlines: bool = True):
     return main_headers, merged_rows, metadata_lines, notes_lines, detected_chinese
 
 
-# Section to time mapping (24h) from user-provided schedule
+# Section → time mapping (24h)
 SECTION_TIMES = {
     1: ("08:00", "08:40"),
     2: ("08:45", "09:25"),
@@ -196,12 +192,55 @@ SECTION_TIMES = {
 
 TYPE_MAP_EN = {"△": "Theory", "★": "Technical", "▲": "Practice", "☆": "Experiment"}
 TYPE_MAP_CN = {"△": "理论", "★": "技术", "▲": "实践", "☆": "实验"}
-# Active type map (defaults to English; will be switched based on detected language)
+# Active type map (switched per language)
 TYPE_MAP = TYPE_MAP_EN
 
 def set_active_type_map(use_chinese: bool) -> None:
     global TYPE_MAP
     TYPE_MAP = TYPE_MAP_CN if use_chinese else TYPE_MAP_EN
+
+
+def summarize_courses(courses: list[dict], is_chinese: bool) -> str:
+    """Return a detailed, human-readable summary of parsed courses/events.
+
+    Includes: day, type, weeks (count and condensed list), sections and time span,
+    course name, effective location, and teacher. Ends with total week-occurrences.
+    """
+    lines: list[str] = []
+    lines.append(f"Detected {len(courses)} courses; generating calendar…")
+    lines.append("-- Course summary --")
+    total_weeks = 0
+    for i, c in enumerate(courses, start=1):
+        name = (c.get("name", "") or "").strip()
+        day = c.get("day") or ("outside" if c.get("outside") else "?")
+        weeks = c.get("weeks", []) or []
+        total_weeks += len(weeks)
+        periods = c.get("periods", []) or []
+        if periods:
+            pspan = f"{min(periods)}-{max(periods)}"
+        else:
+            pspan = "-"
+        loc = c.get("location", "") or ""
+        teacher = c.get("teacher", "") or ""
+        ctype = c.get("type", "") or ""
+        # time span from sections (if any)
+        tspan = ""
+        if periods:
+            ts = SECTION_TIMES.get(min(periods))
+            te = SECTION_TIMES.get(max(periods))
+            if ts and te:
+                tspan = f" {ts[0]}-{te[1]}"
+        # Effective location mirrors ICS behavior
+        if c.get("outside"):
+            eff_loc = (("线上" if is_chinese else "Online") if not loc else loc)
+        else:
+            eff_loc = (loc if loc else ("未定" if is_chinese else "Not yet"))
+        lines.append(
+            f"{i:02d}. [{day}] {ctype} weeks={len(weeks):2d} ({_condense_weeks(weeks)}) "
+            f"sections={pspan}{tspan} :: {name} @ {eff_loc} | {teacher}"
+        )
+    lines.append(f"Total week-occurrences (expected ~ event count): {total_weeks}")
+    return "\n".join(lines)
 
 
 def parse_weeks(weeks_text: str) -> list[int]:
@@ -293,7 +332,7 @@ def parse_block_text(block_text: str, fallback_period: int | None) -> dict | Non
     txt = (block_text or "").strip()
     if not txt:
         return None
-    # Normalize: unify whitespace/newlines for robust regex
+    # Normalize whitespace/newlines
     flat = re.sub(r"\s+", " ", txt)
     # Course name: combine prelude lines before the marker (excluding meta lines) with the marker line prefix
     mpos = re.search(r"[△★▲☆]", txt)
@@ -354,7 +393,7 @@ def parse_block_text(block_text: str, fallback_period: int | None) -> dict | Non
     type_char = mname_line.group(2)
     name_prefix = mname_line.group(1).strip()
     name_raw = (" ".join(prelude_parts + [name_prefix])).strip()
-    # Repair English hyphenated titles broken by line breaks: e.g., "Object-Oriented" + "Analysis & Design"
+    # Fix hyphen/connectors in EN titles
     # Remove spurious spaces around hyphens introduced by joins
     name_raw = re.sub(r"\s*-\s*", "-", name_raw)
     # Merge common English connectors split by newlines: ensure single spaces around '&' and between words
@@ -372,7 +411,7 @@ def parse_block_text(block_text: str, fallback_period: int | None) -> dict | Non
         periods = list(range(s1, s2 + 1))
     else:
         periods = [fallback_period] if fallback_period else []
-    # Weeks: English 'Week ...' or Chinese '第...周' or generic '...周' fragments
+    # Weeks: EN Week / CN 第…周 / generic …周
     weeks: list[int] = []
     w_m = re.search(r"Week\s*([0-9,\-\s]+)", flat)
     if w_m:
@@ -402,7 +441,7 @@ def parse_block_text(block_text: str, fallback_period: int | None) -> dict | Non
                             pass
                 if expanded:
                     weeks = sorted(set(expanded))
-    # Location: Area:<...> or Campus:<...> or Chinese 校区/教学区/地点; or QQ group
+    # Location: Area/Campus or CN 校区/教学区/地点; QQ optional
     loc = ""
     qq_m = re.search(r"课程QQ群号[：:]\s*(\d+)", txt)
     if qq_m:
@@ -449,7 +488,7 @@ def parse_block_text(block_text: str, fallback_period: int | None) -> dict | Non
     # tighten Chinese parentheses spacing
     loc = re.sub(r"\s*（\s*", "（", loc)
     loc = re.sub(r"\s*）\s*", "）", loc)
-    # Teacher: extract after 'Teacher:' or Chinese '任课教师/教师/老师:' possibly spanning multiple following name-only lines
+    # Teacher: after Teacher:/任课教师/教师/老师; gather short continuation lines
     teacher = ""
     # Helpers to decide continuation
     def is_probable_name_line_cn(ln: str) -> bool:
@@ -556,12 +595,7 @@ def parse_block_text(block_text: str, fallback_period: int | None) -> dict | Non
 
 
 def split_blocks_smart(cell_text: str) -> list[list[str]]:
-    """Smart block splitter: include preceding name lines before the line containing the type marker.
-
-    - Detect lines with △★▲☆.
-    - For each marker line, backtrack to include adjacent preceding lines that are not metadata (Section/Week/Campus/Area/Teacher).
-    - The block extends until the next marker line (exclusive).
-    """
+    """Smart block splitter: include name lines just above first marker; stop at next marker."""
     lines = [l.strip() for l in (cell_text or "").split("\n") if l and l.strip()]
     if not lines:
         return []
@@ -612,12 +646,7 @@ def trim_to_first_marker_line(text: str) -> str:
 
 
 def merge_continuation_rows(headers: list[str], rows: list[list[str]]) -> list[list[str]]:
-    """Stitch rows that are continuations of previous rows (PDF split artifacts).
-
-    Heuristic: if the row has empty 'Period of time' and 'Sections' columns, but some day columns contain
-    fragments (often starting with Campus/Area/Teachers), append those fragments to the nearest previous row
-    that has content in the same column. Then clear the fragment cells and drop fully-empty continuation rows.
-    """
+    """Stitch PDF-split continuation rows (empty period/section + day fragments)."""
     if not rows:
         return rows
     # Identify key columns
@@ -914,7 +943,7 @@ def build_ics(
         print("ics library not available; cannot generate calendar.")
         return
     cal = Calendar()
-    # Day index mapping
+    # Day index
     day_to_idx = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
     monday = datetime.strptime(monday_date, "%Y-%m-%d")
     # For scheduling outside courses per week (Saturday at 14:00+)
@@ -931,7 +960,7 @@ def build_ics(
         except Exception:
             tzinfo = None
 
-    # Prepare UID domain
+    # UID domain
     def to_domain(name: str) -> str:
         s = (name or "").strip().lower()
         s = s.replace("@", "-")
@@ -953,7 +982,7 @@ def build_ics(
         weeks = course.get("weeks", [])
         is_outside = course.get("outside", False)
         if is_outside:
-            # Schedule 1-hour slots on Sunday starting 14:00; sequentially per week
+            # Outside: 1-hour on Sunday from 14:00, sequential per week
             for w in weeks:
                 idx = outside_week_slots.get(w, 0)
                 start_hour = 14 + idx
@@ -998,7 +1027,7 @@ def build_ics(
             ev.name = name
             ev.begin = start_dt
             ev.end = end_dt
-            # Default in-table missing location to Not yet/未定 based on locale
+            # In-table empty location → Not yet/未定
             if not location:
                 ev.location = ("未定" if chinese else "Not yet")
             else:
@@ -1010,15 +1039,15 @@ def build_ics(
             uid_counter += 1
             cal.events.add(ev)
 
-    # Write ICS using serializer to ensure proper CRLF line endings
+    # Serialize ICS (ensure CRLF)
     try:
         content = "".join(cal.serialize_iter())
     except Exception:
         content = str(cal)
 
-    # Ensure CALSCALE and METHOD headers and add DTSTAMP to each VEVENT for compatibility
+    # Ensure CALSCALE/METHOD/X-WR-* and add DTSTAMP per VEVENT
     def fix_ics_content(text: str) -> str:
-        # Normalize to CRLF to be safe
+    # Normalize to CRLF
         txt = text.replace("\r\n", "\n").replace("\r", "\n")
         lines = txt.split("\n")
         out: list[str] = []
@@ -1065,7 +1094,7 @@ def build_ics(
                         hdr_injected.append(f"X-WR-TIMEZONE:{tz}")
                     injected = True
             out = hdr_injected
-        # Add DTSTAMP to each VEVENT if missing
+    # Add DTSTAMP if missing
         fixed: list[str] = []
         in_event = False
         buf: list[str] = []
@@ -1162,39 +1191,8 @@ def main() -> None:
         print("No courses detected; cannot generate calendar.")
         sys.exit(1)
 
-    # Optional: small on-screen summary
-    print(f"Detected {len(courses)} courses; generating calendar…")
-    if os.getenv("TT_DEBUG") == "1":
-        # Print a richer per-course summary to help diagnose differences
-        total_weeks = 0
-        print("-- Course summary --")
-        for i, c in enumerate(courses, start=1):
-            name = c.get("name", "").strip()
-            day = c.get("day") or ("outside" if c.get("outside") else "?")
-            weeks = c.get("weeks", []) or []
-            total_weeks += len(weeks)
-            periods = c.get("periods", []) or []
-            if periods:
-                pspan = f"{min(periods)}-{max(periods)}"
-            else:
-                pspan = "-"
-            loc = c.get("location", "")
-            teacher = c.get("teacher", "")
-            ctype = c.get("type", "")
-            # time span from sections (if any)
-            tspan = ""
-            if periods:
-                ts = SECTION_TIMES.get(min(periods))
-                te = SECTION_TIMES.get(max(periods))
-                if ts and te:
-                    tspan = f" {ts[0]}-{te[1]}"
-            # Effective location like ICS behavior
-            if c.get("outside"):
-                eff_loc = (("线上" if is_chinese else "Online") if not loc else loc)
-            else:
-                eff_loc = (loc if loc else ("未定" if is_chinese else "Not yet"))
-            print(f"{i:02d}. [{day}] {ctype} weeks={len(weeks):2d} ({_condense_weeks(weeks)}) sections={pspan}{tspan} :: {name} @ {eff_loc} | {teacher}")
-        print(f"Total week-occurrences (expected ~ event count): {total_weeks}")
+    # Always show a concise per-course summary to help verify parsing
+    print(summarize_courses(courses, is_chinese))
 
     # Derive default calendar name/desc if not provided
     def derive_calendar_name(pdf_path: str, ics_path: str) -> str:

@@ -1,6 +1,6 @@
-# Timetable → Calendar (ZJNU prototype)
+# Timetable to Calendar ZJNU
 
-This is a small prototype that parses Zhejiang Normal University (ZJNU) PDF timetables and exports an iCalendar (.ics) file you can import into any calendar app.
+Parse Zhejiang Normal University (ZJNU) timetable PDFs and export an iCalendar (.ics) file you can import into Samsung/Google/Apple calendars.
 
 Why a prototype? Because the best place to generate calendars is upstream, at the university portal itself. The same page that renders the timetable already has clean, structured data in the database; adding a “Download .ics” button there would be simpler, more reliable, and far easier to maintain than parsing PDFs. We hope universities adopt this idea in the future.
 
@@ -14,7 +14,7 @@ Why a prototype? Because the best place to generate calendars is upstream, at th
 - Maps “Sections” to exact start/end times provided by you.
 - Builds a standards-compliant ICS with calendar metadata suitable for Samsung/Google/Apple calendars.
 - Outside (dayless) courses are scheduled on Sunday in 1-hour slots starting at 14:00 (14–15, 15–16, …) per week.
-- Optional debug mode prints a concise, per-course summary to help verify parsing.
+- Prints a detailed, per-course summary (always on) to help verify parsing.
 
 ## How it works (brief)
 
@@ -24,7 +24,7 @@ Why a prototype? Because the best place to generate calendars is upstream, at th
 - Extracts teacher/location from English or Chinese labels; preserves “Not yet/未定”. Outside items default to “Online/线上”.
 - Generates `.ics` via the `ics` library with proper headers and DTSTAMP; times follow the configured section timetable exactly.
 
-## Core function: build_ics (the reusable idea)
+## Core function: build_ics
 
 The heart of this project is the `build_ics` function. Everything else (PDF parsing, cleanup) just prepares data for it. If your system already has structured data, you can skip all parsing and call this function directly.
 
@@ -88,11 +88,14 @@ Re-implementing elsewhere: If you already know week numbers, weekday, section sp
 
 - Python 3.9+
 - pip packages: `pdfplumber`, `ics`
+ - Optional (for drag-and-drop in the GUI): `tkinterdnd2`
 
 Install:
 
 ```pwsh
 pip install pdfplumber ics
+# optional for GUI drag-and-drop support
+pip install tkinterdnd2
 ```
 
 ## Usage
@@ -103,14 +106,33 @@ Run interactively and provide the PDF path and the Monday date of week 1:
 python timetable_to_calendar_zjnu.py
 ```
 
-Optional: enable debug summaries
+The script writes the `.ics` file next to your PDF.
+
+### Windows GUI (Tkinter, no extra deps)
+
+Tkinter comes with Python. Run the GUI:
 
 ```pwsh
-$env:TT_DEBUG=1
-python timetable_to_calendar_zjnu.py
+python gui_win.py
 ```
 
-The script writes the `.ics` file next to your PDF.
+Build a standalone EXE with an icon:
+
+```pwsh
+pip install pyinstaller
+pyinstaller --onefile --noconsole --icon assets/icon.ico --name "Timetable to Calendar ZJNU" gui_win.py
+```
+
+CLI also available via `timetable_to_calendar_zjnu.py`.
+
+GUI features:
+
+- Browse to pick a PDF, or drag-and-drop a PDF anywhere in the window (requires `tkinterdnd2`, optional).
+- Enter “Week 1 Monday” date, or use the small Pick date dialog.
+- Quick preset button “2025 1st Semester” fills the date for Fall 2025.
+- Centered “Generate ICS” primary button.
+- Output panel shows the full, detailed per-course summary and a completion line.
+- Buttons to open the generated `.ics` or its folder.
 
 ### Example (English PDF)
 
@@ -121,7 +143,7 @@ Enter the PDF timetable path: .\samples\AL RAIMI ABDULLAH(2025-2026-1)课表 EN.
 Enter the Monday date of week 1 (YYYY-MM-DD): 2025-09-08
 ```
 
-Output (excerpt):
+Output (excerpt; the same detailed summary also appears in the GUI output panel):
 
 ```text
 Detected 17 courses; generating calendar…
