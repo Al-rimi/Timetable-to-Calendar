@@ -24,6 +24,66 @@ Why a prototype? Because the best place to generate calendars is upstream, at th
 - Extracts teacher/location from English or Chinese labels; preserves “Not yet/未定”. Outside items default to “Online/线上”.
 - Generates `.ics` via the `ics` library with proper headers and DTSTAMP; times follow the configured section timetable exactly.
 
+## Core function: build_ics (the reusable idea)
+
+The heart of this project is the `build_ics` function. Everything else (PDF parsing, cleanup) just prepares data for it. If your system already has structured data, you can skip all parsing and call this function directly.
+
+Function signature (simplified):
+
+```
+build_ics(
+  courses: list[dict],        # parsed classes
+  monday_date: str,           # YYYY-MM-DD, week 1 Monday
+  output_path: str,           # where to write .ics
+  tz: str = "Asia/Shanghai",
+  tz_mode: str = "floating", # "floating"|"tzid"|"utc"
+  cal_name: str | None = None,
+  cal_desc: str | None = None,
+  uid_domain: str | None = None,
+  chinese: bool = False,
+) -> None
+```
+
+Expected `courses` item shape:
+
+- name: str — full title + type (e.g., "Software Testing Theory")
+- day: str — Mon/Tue/Wed/Thu/Fri/Sat/Sun (omit for “outside”)
+- weeks: list[int] — academic weeks (1-based)
+- periods: list[int] — section numbers (e.g., [6,7])
+- teacher: str — instructor name
+- location: str — room/campus; keep empty to default to Not yet/未定
+- outside: bool — true for items not on a timetable day
+
+What it does:
+
+1. Computes each class date by adding (week-1) weeks and day offset to `monday_date`.
+
+2. Maps `periods` to exact start/end times using SECTION_TIMES (authoritative bell times).
+
+3. Creates one VEVENT per (course × week) with:
+
+   - Name, DTSTART, DTEND
+   - Location: in-table empty → Not yet/未定; outside → Online/线上
+   - Description: localized "Teacher: …"
+   - Stable UID with optional `uid_domain` (e.g., studentId.term)
+
+4. Writes an ICS with:
+   - CALSCALE, METHOD, X-WR-CALNAME, X-WR-CALDESC, X-WR-TIMEZONE
+   - DTSTAMP on each VEVENT
+   - CRLF line endings for importer compatibility
+
+Special handling:
+
+- tz_mode:
+
+  - floating (default): write local times without TZ, avoids device shifts
+  - tzid: add TZID parameter for DTSTART/DTEND
+  - utc: write UTC and strip trailing Z for uniformity
+
+- Outside courses (no day): placed on Sunday in 1-hour slots starting at 14:00 per week (14–15, 15–16, …).
+
+Re-implementing elsewhere: If you already know week numbers, weekday, section spans, and room/teacher, you can build `courses` and call `build_ics` without any PDF work.
+
 ## Requirements
 
 - Python 3.9+
