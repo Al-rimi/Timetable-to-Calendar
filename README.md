@@ -1,127 +1,136 @@
-# Timetable to Calendar ZJNU
-
-Convert ZJNU timetable PDFs (EN/CN) into iCalendar (.ics) for Samsung, Google, Apple, and Outlook.
+# Timetable to Calendar
 
 [![Release](https://img.shields.io/github/v/release/Al-rimi/Timetable-to-Calendar)](https://github.com/Al-rimi/Timetable-to-Calendar/releases)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-> Prototype: provided “as is,” without warranty or liability. Not affiliated with ZJNU.
+![](assets/screenshot.png)
 
-## Features
+Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalendar (.ics) files that import cleanly into all major calendar apps. Note: extracting courses from PDFs consumes unnecessary CPU/memory and adds failure points. The same page that generates the PDF already has structured timetable data from the database. The efficient solution is to produce the .ics directly from that data.
 
-- Bilingual parsing with robust course block detection (△ ★ ▲ ☆)
-- Exact section times for reliable imports
-- Keeps “Not yet/未定”; outside items placed Sundays 14:00+ (1‑hour slots)
-- Always‑on detailed per‑course summary (CLI/GUI)
-- Simple Windows GUI (Browse/Drag‑and‑drop, Pick date, preset “2025 1st Semester”)
-- CI builds for Windows, macOS, and Linux
+## Why Calendars, Not Timetables
+
+- Less manual work: add once, see every class automatically.
+- Fewer mistakes: time/location changes propagate to calendars.
+- Works everywhere: one .ics fits all calendar apps.
+- Lower support load for universities: fewer “when/where” questions.
 
 ## Downloads
 
-| Platform | File     | Notes                            | Download             |
-| -------- | -------- | -------------------------------- | -------------------- |
-| Windows  | EXE      | duoble-click to run              | [Download][win-dl]   |
-| macOS    | .app.zip | Unsigned; right‑click → Open     | [Download][mac-dl]   |
-| Linux    | .tar.gz  | chmod +x; ensure Tk is installed | [Download][linux-dl] |
+- Windows: [Download][win-dl]
+- macOS: [Download][mac-dl]
+- Linux: [Download][linux-dl]
 
-## Run from source
+See [Changelog](CHANGELOG.md) for updates.
 
-- From source (GUI):
+## Quick Start (from source)
+
+- Requirements: Python 3.10+ and `pip`.
+- Install:
+  ```pwsh
+  pip install -r requirements.txt
+  ```
+- Run GUI:
   ```pwsh
   python gui_win.py
   ```
-- From source (CLI):
+- Run CLI:
   ```pwsh
   python timetable_to_calendar_zjnu.py
   ```
+  The CLI is interactive: it prompts for the PDF path and the Week 1 Monday date, then writes the `.ics` next to the PDF.
 
-## Build (all platforms)
+## How It Works
 
-These steps produce a standalone binary using PyInstaller. Ensure Python 3.9+ and pip are installed.
+- Input: ZJNU timetable PDF (EN/CN).
+- Parse: extract tables and normalize course data.
+- Generate: `build_ics` creates RFC 5545‑compliant events with stable UIDs and correct time handling (floating/TZID/UTC). One VEVENT is emitted per week occurrence for maximum importer compatibility.
+- Output: a clean `.ics` you can import or subscribe to.
 
-Common Python dependencies:
+## For Universities (Recommended)
 
-```bash
-pip install -r requirements.txt
-pip install pyinstaller
+Direct server‑side ICS requires fewer resources and is more reliable than PDF parsing because the structured timetable rows already exist in the same session as the PDF generation. Implement:
+
+- Direct iCalendar export: a “Download .ics” button generated from the same data source used for the PDF.
+- Subscription feeds: secure, tokenized `webcal`/HTTPS URLs per user for auto‑updated schedules.
+- Minimal mapping: course → VEVENT (summary, location, weekday/section → start/end, weeks → RRULE/EXDATE or one instance per week), stable `UID`, `DTSTAMP`, and consistent timezone handling.
+
+Outcome: no client parsing, lower CPU usage, instant updates across all calendar apps.
+
+Suggested field mapping (server‑side):
+
+- Summary: course name (+ type if needed)
+- Location: explicit room/campus; fallback to “Not yet/未定”
+- DTSTART/DTEND: computed from weekday + section times (or your canonical schedule)
+- Weeks: either `RRULE:FREQ=WEEKLY;BYDAY=...` with selective `EXDATE`s, or pre‑expanded instances (what this tool does)
+- UID: stable key such as `<student-id>.<term>.<course-id>-<occurrence>@your-domain`
+
+Tiny example using RRULE/EXDATE (server‑side):
+
+```
+BEGIN:VEVENT
+UID:20251234.2025-2026-1.CS101-07@calendar.zjnu.edu.cn
+DTSTAMP:20240901T000000Z
+SUMMARY:CS101 Theory
+LOCATION:Main Campus 25-315
+DTSTART;TZID=Asia/Shanghai:20250908T080000
+DTEND;TZID=Asia/Shanghai:20250908T092500
+RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=16
+EXDATE;TZID=Asia/Shanghai:20251006T080000
+END:VEVENT
 ```
 
-### Windows
+<details>
+<summary><strong>Technical Details (build_ics)</strong></summary>
 
-Using the provided spec (recommended):
+Core generation function:
 
-```pwsh
-pyinstaller --noconfirm gui_win.spec
+```
+build_ics(courses, monday_date, output_path,
+          tz="Asia/Shanghai", tz_mode="floating",
+          cal_name=None, cal_desc=None,
+          uid_domain=None, chinese=False)
 ```
 
-One-file alternative with icon:
+- Input model: each course dict may include `name`, `day` (`Mon`…`Sun`), `periods` (section numbers), `weeks` (list of week indices), `location`, `teacher`, and optional `outside=True`.
+- Time map: section numbers are mapped via `SECTION_TIMES` (08:00–21:10). `monday_date` anchors week 1; dates are derived by weekday + (`week-1`).
+- Timezone modes:
+  - `floating` (default): writes local wall‑times without `TZID`/`Z` for best cross‑app behavior.
+  - `tzid`: writes `DTSTART;TZID=<tz>`/`DTEND;TZID=<tz>` and adds `X‑WR‑TIMEZONE`.
+  - `utc`: currently normalized to floating (no trailing `Z`) to keep campus times fixed across clients.
+- UID strategy: stable, deterministic UIDs like `class-0001@<domain>`. The CLI derives `<domain>` from student id and term when available; otherwise from a sanitized calendar name. This keeps event identities stable across re‑exports.
+- Outside‑of‑table items: scheduled on Sunday starting 14:00, one hour per item; multiple outside items in the same week are placed at 15:00, 16:00, …
+- Import robustness: all event descriptions are single‑line; empty in‑table locations become `Not yet/未定`; outside items default to `Online/线上` when no location is present.
+- ICS normalization: after serialization, the tool enforces CRLF line endings and injects missing calendar headers: `CALSCALE:GREGORIAN`, `METHOD:PUBLISH`, `X‑WR‑CALNAME`, `X‑WR‑CALDESC`, `X‑WR‑TIMEZONE`. It also ensures each `VEVENT` has a `DTSTAMP` and adjusts `DTSTART/DTEND` to match the selected `tz_mode`.
+- Event granularity: no `RRULE`s are used in the generated file; the tool emits one `VEVENT` per week occurrence to maximize compatibility across calendar clients.
 
-```pwsh
-pyinstaller --onefile --noconsole --icon assets/icon.ico --name "Timetable to Calendar ZJNU" gui_win.py
-```
+</details>
 
-Output appears in the `dist/` folder.
+## Build
 
-### macOS
+- Create executables with PyInstaller:
 
-Build a windowed .app bundle:
+  ```pwsh
+  # Windows
+  pyinstaller --noconfirm gui_win.spec
 
-```bash
-pyinstaller --noconfirm --windowed --name "Timetable to Calendar ZJNU" gui_win.py
-```
+  # macOS (unsigned app bundle)
+  pyinstaller --noconfirm --windowed --name "Timetable to Calendar ZJNU" gui_win.py
+
+  # Linux (install Tk if needed)
+  pyinstaller --noconfirm --noconsole --onefile --name "timetable-to-calendar-zjnu" gui_win.py
+  ```
 
 Notes:
 
-- The app is unsigned; on first run, right‑click the app and choose Open.
-- If Tk is missing, install it (for example, via Homebrew: `brew install tcl-tk`).
-- To use an icon, provide a `.icns` file and add `--icon path/to/icon.icns`.
+- Python 3.10+ is required (uses modern type hints like `X | None`).
+- On Linux, install Tk runtime (e.g., `sudo apt-get install python3-tk`) before running or building.
+- The Windows build uses the provided spec (`gui_win.spec`) and embeds the app icon.
 
-### Linux
+## License & Disclaimer
 
-Install system Tk (example for Debian/Ubuntu):
-
-```bash
-sudo apt-get update
-sudo apt-get install -y python3-tk
-```
-
-Build a one-file binary:
-
-```bash
-pyinstaller --noconfirm --noconsole --onefile --name "timetable-to-calendar-zjnu" gui_win.py
-```
-
-Notes:
-
-- After extracting on another machine, ensure the file is executable: `chmod +x timetable-to-calendar-zjnu`.
-- For broader compatibility, build on an older distribution (glibc compatibility).
-
-## Importing the .ics
-
-- Samsung/Google/Apple: import normally
-- Outlook (Windows):
-  - New Outlook: use Outlook on the web → Calendar → Add calendar → Upload from file (choose destination calendar), or use Classic Outlook
-  - Classic Outlook: File → Open & Export → Import/Export → Import an iCalendar (.ics) → choose destination calendar
-
-## Requirements
-
-- Python 3.9+
-- pip: pdfplumber, ics
-- Optional (GUI drag‑and‑drop): tkinterdnd2
-
-## Server‑side ICS (ideal)
-
-Universities can skip PDFs and provide either:
-
-- A “Download .ics” button (on‑demand file), or
-- A tokenized subscribe‑able ICS URL (webcal/https) that auto‑updates in users’ calendars
-
-Benefits: zero client setup, fewer errors, instant updates, and true cross‑platform support.
-
-## License
-
-MIT — see LICENSE.
+- MIT License — see [LICENSE](LICENSE).
+- Research prototype provided “as is.” Not affiliated with ZJNU.
 
 <!-- Download link references -->
 
