@@ -25,14 +25,26 @@ Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalend
 
 <center>
 
-| Windows  | [Download][win-dl] |
-|----------|----------|
-| macOS    | [Download][mac-dl] |
-| Linux    | [Download][linux-dl] |
+| Windows | [Download][win-dl]   |
+| ------- | -------------------- |
+| macOS   | [Download][mac-dl]   |
+| Linux   | [Download][linux-dl] |
 
 </center>
 
+<details>
+<summary><strong>How to import .ics files</strong></summary>
+
+- **iOS** (Apple Calendar): save the `.ics` to Files, then drag the file into Calendar.
+- **Android**: some calendar apps import `.ics` directly just double click. If not, import via web at `calendar.google.com` → Settings → Import, then sync to your phone.
+- **Windows** (Outlook/Calendar): double‑click the `.ics` and choose Outlook/Calendar, or Outlook → File → Open & Export → Import/Export → iCalendar (.ics).
+- **macOS** (Calendar): double‑click the `.ics` to open in Calendar, or drag it onto the Calendar app.
+- **Linux**: open with your calendar app (e.g., GNOME Calendar: File → Import; Thunderbird: File → Open → Calendar File).
+
+</details>
+
 ---
+
 Need help or want to improve this project?
 
 - Open an [issue](https://github.com/Al-rimi/Timetable-to-Calendar/issues) for bugs or feature requests.
@@ -56,7 +68,6 @@ Direct server‑side ICS requires fewer resources and is more reliable than PDF 
 - Minimal mapping: course → VEVENT (summary, location, weekday/section → start/end, weeks → RRULE/EXDATE or one instance per week), stable `UID`, `DTSTAMP`, and consistent timezone handling.
 
 Outcome: no client parsing, lower CPU usage, instant updates across all calendar apps.
-
 
 <details>
 <summary><strong>Technical Details (build_ics)</strong></summary>
@@ -148,7 +159,7 @@ Notes:
 ## License & Disclaimer
 
 - MIT License — see [LICENSE](LICENSE).
-- Research prototype provided “as is.” Not affiliated with ZJNU.
+> Research prototype provided “as is.” Not affiliated with ZJNU.
 
 <!-- Download link references -->
 
