@@ -25,6 +25,13 @@ Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalend
 
 See [Changelog](CHANGELOG.md) for updates.
 
+## How It Works
+
+- Input: ZJNU timetable PDF (EN/CN).
+- Parse: extract tables and normalize course data.
+- Generate: `build_ics` creates RFC 5545‑compliant events with stable UIDs and correct time handling (floating/TZID/UTC). One VEVENT is emitted per week occurrence for maximum importer compatibility.
+- Output: a clean `.ics` you can import or subscribe to.
+
 ## Quick Start (from source)
 
 - Requirements: Python 3.10+ and `pip`.
@@ -41,13 +48,6 @@ See [Changelog](CHANGELOG.md) for updates.
   python timetable_to_calendar_zjnu.py
   ```
   The CLI is interactive: it prompts for the PDF path and the Week 1 Monday date, then writes the `.ics` next to the PDF.
-
-## How It Works
-
-- Input: ZJNU timetable PDF (EN/CN).
-- Parse: extract tables and normalize course data.
-- Generate: `build_ics` creates RFC 5545‑compliant events with stable UIDs and correct time handling (floating/TZID/UTC). One VEVENT is emitted per week occurrence for maximum importer compatibility.
-- Output: a clean `.ics` you can import or subscribe to.
 
 ## For Universities (Recommended)
 
