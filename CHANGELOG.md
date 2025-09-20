@@ -6,12 +6,20 @@ The format is based on Keep a Changelog, and the versioning follows SemVer while
 
 ## [v0.0.4] - 2025-09-20
 
-Packaging hardening and AV/SmartScreen guidance
+Safer distribution
 
-- Windows build: disabled UPX packing to reduce antivirus false positives.
-- Embedded Windows version resource (`version_file.txt`) in the EXE to improve file metadata and reputation.
-- README: added a “Security/AV notes (Windows)” section with SmartScreen steps and signing recommendations.
-- Docs: improved downloads layout and added platform-specific import instructions.
+- Windows build: UPX disabled in `gui_win.spec` to reduce antivirus false positives.
+- Simplified packaging assets: removed `gui_win_onedir.spec`, `scripts/sign-windows.ps1`, and `version_file.txt`; keep a single minimal spec.
+- Documentation:
+  - Restored a generic Downloads section pointing to Releases (no per‑OS direct links).
+  - Consolidated Build section with one clear command per platform (Windows/macOS/Linux).
+  - Added “Safe Distribution” guidance (SmartScreen/AV, Apple notarization, checksums).
+  - Kept concise “Importing .ics” steps.
+- Packaging (maintainer‑facing):
+  - Added `pyproject.toml` with project metadata and entry points.
+  - Added `publish.yml` for tag‑based PyPI publishing via trusted publishing (optional).
+- Tooling: added `tools/smoke_test.py` for quick end‑to‑end verification (sample produced 174 events with correct headers/CRLF).
+- No functional changes to ICS generation.
 
 ## [v0.0.3] - 2025-09-19
 

@@ -135,53 +135,49 @@ build_ics(courses, monday_date, output_path,
   ```
   The CLI is interactive: it prompts for the PDF path and the Week 1 Monday date, then writes the `.ics` next to the PDF.
 
-## Official Install (recommended)
-
-For the smoothest, trusted install across platforms, use Python packaging. This avoids SmartScreen/AV friction and keeps the tool auto‑updatable.
-
-- Install via pipx (recommended):
-  ```pwsh
-  pipx install timetable-to-calendar-zjnu
-  zjnu-ics-gui   # launch GUI
-  # or
-  zjnu-ics       # run CLI
-  ```
-- Or install via pip (user scope):
-  ```pwsh
-  python -m pip install --user timetable-to-calendar-zjnu
-  python -m timetable_to_calendar_zjnu
-  ```
-
-Maintainers: publish to PyPI
-
-```pwsh
-python -m pip install build twine
-python -m build
-python -m twine upload dist/*
-```
-
 ## Build
 
-- Create executables with PyInstaller:
+Build a self‑contained app for your platform using PyInstaller.
 
+- Windows (one‑file EXE):
   ```pwsh
-  # Windows
   pyinstaller --noconfirm gui_win.spec
-
-  # macOS (unsigned app bundle)
+  ```
+- macOS (app bundle, unsigned):
+  ```bash
   pyinstaller --noconfirm --windowed --name "Timetable to Calendar ZJNU" gui_win.py
-
-  # Linux (install Tk if needed)
+  ```
+- Linux (one‑file binary; ensure Tk is installed):
+  ```bash
+  sudo apt-get update && sudo apt-get install -y python3-tk
   pyinstaller --noconfirm --noconsole --onefile --name "timetable-to-calendar-zjnu" gui_win.py
   ```
 
-Notes:
+Notes
+- Requires Python 3.10+.
+- On Linux/macOS, ensure Tk is available (e.g., `python3-tk` on Debian/Ubuntu).
+- Binaries are unsigned; first‑run prompts may appear on some systems.
 
-- Python 3.10+ is required (uses modern type hints like `X | None`).
-- On Linux, install Tk runtime (e.g., `sudo apt-get install python3-tk`) before running or building.
-- Prefer PyPI/pipx distribution for the smoothest install across platforms; the Windows EXE is optional for offline use.
+## Safe Distribution (reduce AV/SmartScreen warnings)
 
-Note on Windows security prompts: unsigned, new binaries may trigger SmartScreen. Prefer installing via PyPI/pipx for a trusted experience. If you distribute EXEs at scale, consider standard Authenticode code‑signing outside the scope of this repo.
+- Windows
+  - Sign the EXE with an EV Code Signing certificate (best) or standard Authenticode to build SmartScreen reputation.
+  - Avoid packers/obfuscators (UPX already disabled); keep stable file names and embedded version info.
+  - Optionally package as MSIX and sign, or publish via Microsoft Store for the smoothest install.
+  - If flagged, submit the file to Microsoft for review: https://www.microsoft.com/wdsi/filesubmission
+  - Provide SHA256 checksums so users can verify integrity:
+    ```pwsh
+    Get-FileHash "dist/Timetable to Calendar ZJNU.exe" -Algorithm SHA256
+    ```
+- macOS
+  - Sign with Developer ID Application and notarize with Apple (`codesign` + `notarytool`), then staple.
+  - Distribute the `.app` (or a signed `.dmg`) to avoid Gatekeeper blocks.
+- Linux
+  - Provide `.AppImage` or `.tar.gz` plus a detached signature (GPG or `cosign`) and published checksums.
+  
+These steps are optional for development, but recommended for sharing executables widely without false positives.
+
+ 
 
 ## License & Disclaimer
 
