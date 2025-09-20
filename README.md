@@ -1,6 +1,6 @@
 # Timetable to Calendar
 
-<center>
+<div align="center">
 
 [![Release](https://img.shields.io/github/v/release/Al-rimi/Timetable-to-Calendar)](https://github.com/Al-rimi/Timetable-to-Calendar/releases)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f)
@@ -8,7 +8,7 @@
 
 ![](assets/showcase.gif)
 
-</center>
+</div>
 
 Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalendar (.ics) files that import cleanly into all major calendar apps. Note: extracting courses from PDFs consumes unnecessary CPU/memory and adds failure points. The same page that generates the PDF already has structured timetable data from the database. The efficient solution is to produce the .ics directly from that data.
 
@@ -21,16 +21,16 @@ Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalend
 
 ## Downloads
 
-![](assets/screenshot.png)
+<div align="center">
 
-<center>
+![](assets/screenshot.png)
 
 | Windows | [Download][win-dl]   |
 | ------- | -------------------- |
 | macOS   | [Download][mac-dl]   |
 | Linux   | [Download][linux-dl] |
 
-</center>
+</div>
 
 <details>
 <summary><strong>How to import .ics files</strong></summary>
