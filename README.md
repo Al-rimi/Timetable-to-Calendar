@@ -135,6 +135,31 @@ build_ics(courses, monday_date, output_path,
   ```
   The CLI is interactive: it prompts for the PDF path and the Week 1 Monday date, then writes the `.ics` next to the PDF.
 
+## Official Install (recommended)
+
+For the smoothest, trusted install across platforms, use Python packaging. This avoids SmartScreen/AV friction and keeps the tool auto‑updatable.
+
+- Install via pipx (recommended):
+  ```pwsh
+  pipx install timetable-to-calendar-zjnu
+  zjnu-ics-gui   # launch GUI
+  # or
+  zjnu-ics       # run CLI
+  ```
+- Or install via pip (user scope):
+  ```pwsh
+  python -m pip install --user timetable-to-calendar-zjnu
+  python -m timetable_to_calendar_zjnu
+  ```
+
+Maintainers: publish to PyPI
+
+```pwsh
+python -m pip install build twine
+python -m build
+python -m twine upload dist/*
+```
+
 ## Build
 
 - Create executables with PyInstaller:
@@ -154,13 +179,9 @@ Notes:
 
 - Python 3.10+ is required (uses modern type hints like `X | None`).
 - On Linux, install Tk runtime (e.g., `sudo apt-get install python3-tk`) before running or building.
-- The Windows build uses the provided spec (`gui_win.spec`) and embeds the app icon.
+- Prefer PyPI/pipx distribution for the smoothest install across platforms; the Windows EXE is optional for offline use.
 
-Security/AV notes (Windows):
-
-- If Microsoft Defender SmartScreen warns about an “unrecognized app”, that’s typical for unsigned, new binaries. Click “More info” → “Run anyway” if you trust the source.
-- Some AV engines falsely flag PyInstaller EXEs. This build disables UPX packing in `gui_win.spec` to reduce false positives and embeds a version resource (`version_file.txt`).
-- For distribution at scale, sign your EXE with an Authenticode certificate to minimize SmartScreen warnings.
+Note on Windows security prompts: unsigned, new binaries may trigger SmartScreen. Prefer installing via PyPI/pipx for a trusted experience. If you distribute EXEs at scale, consider standard Authenticode code‑signing outside the scope of this repo.
 
 ## License & Disclaimer
 

@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "timetable-to-calendar-zjnu"
+version = "0.0.4"
+description = "Convert ZJNU timetable PDFs to iCalendar (.ics)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Al-rimi" }]
+keywords = ["ZJNU", "calendar", "ics", "timetable", "pdf"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Environment :: Win32 (MS Windows)",
+  "Environment :: MacOS X",
+  "Environment :: X11 Applications",
+]
+dependencies = [
+  "pdfplumber",
+  "ics",
+  "tkinterdnd2",
+]
+
+[project.urls]
+Homepage = "https://github.com/Al-rimi/Timetable-to-Calendar"
+Issues = "https://github.com/Al-rimi/Timetable-to-Calendar/issues"
+Changelog = "https://github.com/Al-rimi/Timetable-to-Calendar/blob/main/CHANGELOG.md"
+
+[project.scripts]
+zjnu-ics = "timetable_to_calendar_zjnu:main"
+zjnu-ics-gui = "gui_win:main"
+
+[tool.setuptools]
+py-modules = ["timetable_to_calendar_zjnu", "gui_win"]
