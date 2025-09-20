@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and the versioning follows SemVer while we are in early prototype stage.
 
+## [v0.0.4] - 2025-09-20
+
+Packaging hardening and AV/SmartScreen guidance
+
+- Windows build: disabled UPX packing to reduce antivirus false positives.
+- Embedded Windows version resource (`version_file.txt`) in the EXE to improve file metadata and reputation.
+- README: added a “Security/AV notes (Windows)” section with SmartScreen steps and signing recommendations.
+- Docs: improved downloads layout and added platform-specific import instructions.
+
 ## [v0.0.3] - 2025-09-19
 
 Multi‑platform builds and documentation overhaul

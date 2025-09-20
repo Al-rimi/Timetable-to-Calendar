@@ -156,10 +156,16 @@ Notes:
 - On Linux, install Tk runtime (e.g., `sudo apt-get install python3-tk`) before running or building.
 - The Windows build uses the provided spec (`gui_win.spec`) and embeds the app icon.
 
+Security/AV notes (Windows):
+
+- If Microsoft Defender SmartScreen warns about an “unrecognized app”, that’s typical for unsigned, new binaries. Click “More info” → “Run anyway” if you trust the source.
+- Some AV engines falsely flag PyInstaller EXEs. This build disables UPX packing in `gui_win.spec` to reduce false positives and embeds a version resource (`version_file.txt`).
+- For distribution at scale, sign your EXE with an Authenticode certificate to minimize SmartScreen warnings.
+
 ## License & Disclaimer
 
 - MIT License — see [LICENSE](LICENSE).
-> Research prototype provided “as is.” Not affiliated with ZJNU.
+  > Research prototype provided “as is.” Not affiliated with ZJNU.
 
 <!-- Download link references -->
 
