@@ -1,10 +1,14 @@
 # Timetable to Calendar
 
+<center>
+
 [![Release](https://img.shields.io/github/v/release/Al-rimi/Timetable-to-Calendar)](https://github.com/Al-rimi/Timetable-to-Calendar/releases)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ![](assets/showcase.gif)
+
+</center>
 
 Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalendar (.ics) files that import cleanly into all major calendar apps. Note: extracting courses from PDFs consumes unnecessary CPU/memory and adds failure points. The same page that generates the PDF already has structured timetable data from the database. The efficient solution is to produce the .ics directly from that data.
 
@@ -19,9 +23,20 @@ Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalend
 
 ![](assets/screenshot.png)
 
-- Windows: [Download][win-dl]
-- macOS: [Download][mac-dl]
-- Linux: [Download][linux-dl]
+<center>
+
+| Windows  | [Download][win-dl] |
+|----------|----------|
+| macOS    | [Download][mac-dl] |
+| Linux    | [Download][linux-dl] |
+
+</center>
+
+---
+Need help or want to improve this project?
+
+- Open an [issue](https://github.com/Al-rimi/Timetable-to-Calendar/issues) for bugs or feature requests.
+- Or [Contribute via PRs](https://github.com/Al-rimi/Timetable-to-Calendar/pulls).
 
 See [Changelog](CHANGELOG.md) for updates.
 
@@ -32,24 +47,7 @@ See [Changelog](CHANGELOG.md) for updates.
 - Generate: `build_ics` creates RFC 5545‑compliant events with stable UIDs and correct time handling (floating/TZID/UTC). One VEVENT is emitted per week occurrence for maximum importer compatibility.
 - Output: a clean `.ics` you can import or subscribe to.
 
-## Quick Start (from source)
-
-- Requirements: Python 3.10+ and `pip`.
-- Install:
-  ```pwsh
-  pip install -r requirements.txt
-  ```
-- Run GUI:
-  ```pwsh
-  python gui_win.py
-  ```
-- Run CLI:
-  ```pwsh
-  python timetable_to_calendar_zjnu.py
-  ```
-  The CLI is interactive: it prompts for the PDF path and the Week 1 Monday date, then writes the `.ics` next to the PDF.
-
-## For Universities (Recommended)
+## For Universities
 
 Direct server‑side ICS requires fewer resources and is more reliable than PDF parsing because the structured timetable rows already exist in the same session as the PDF generation. Implement:
 
@@ -58,6 +56,10 @@ Direct server‑side ICS requires fewer resources and is more reliable than PDF 
 - Minimal mapping: course → VEVENT (summary, location, weekday/section → start/end, weeks → RRULE/EXDATE or one instance per week), stable `UID`, `DTSTAMP`, and consistent timezone handling.
 
 Outcome: no client parsing, lower CPU usage, instant updates across all calendar apps.
+
+
+<details>
+<summary><strong>Technical Details (build_ics)</strong></summary>
 
 Suggested field mapping (server‑side):
 
@@ -82,9 +84,6 @@ EXDATE;TZID=Asia/Shanghai:20251006T080000
 END:VEVENT
 ```
 
-<details>
-<summary><strong>Technical Details (build_ics)</strong></summary>
-
 Core generation function:
 
 ```
@@ -107,6 +106,23 @@ build_ics(courses, monday_date, output_path,
 - Event granularity: no `RRULE`s are used in the generated file; the tool emits one `VEVENT` per week occurrence to maximize compatibility across calendar clients.
 
 </details>
+
+## Quick Start (from source)
+
+- Requirements: Python 3.10+ and `pip`.
+- Install:
+  ```pwsh
+  pip install -r requirements.txt
+  ```
+- Run GUI:
+  ```pwsh
+  python gui_win.py
+  ```
+- Run CLI:
+  ```pwsh
+  python timetable_to_calendar_zjnu.py
+  ```
+  The CLI is interactive: it prompts for the PDF path and the Week 1 Monday date, then writes the `.ics` next to the PDF.
 
 ## Build
 
