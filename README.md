@@ -4,7 +4,7 @@
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-![](assets/screenshot.png)
+![](assets/showcase.gif)
 
 Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalendar (.ics) files that import cleanly into all major calendar apps. Note: extracting courses from PDFs consumes unnecessary CPU/memory and adds failure points. The same page that generates the PDF already has structured timetable data from the database. The efficient solution is to produce the .ics directly from that data.
 
@@ -16,6 +16,8 @@ Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalend
 - Lower support load for universities: fewer “when/where” questions.
 
 ## Downloads
+
+![](assets/screenshot.png)
 
 - Windows: [Download][win-dl]
 - macOS: [Download][mac-dl]
