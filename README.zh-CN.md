@@ -213,9 +213,9 @@ VS Code：终端 → 运行任务 → “Build: Windows (onefile)” 或选择 o
 
 <!-- 下载链接引用 -->
 
-[win-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/v0.0.3/Timetable.to.Calendar.ZJNU.exe
-[mac-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/v0.0.3/Timetable.to.Calendar.ZJNU.app.zip
-[linux-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/v0.0.3/timetable-to-calendar-zjnu.tar.gz
+[win-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/1.0.1/Timetable.to.Calendar.ZJNU.exe
+[mac-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/1.0.1/Timetable.to.Calendar.ZJNU.app.zip
+[linux-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/1.0.1/timetable-to-calendar-zjnu.tar.gz
 
 ## 调试与开发工具
 
