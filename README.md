@@ -2,6 +2,8 @@
 
 <div align="center">
 
+[中文说明 (Chinese)](README.zh-CN.md) · [Gitee Mirror](https://gitee.com/al-rimi/Timetable-to-Calendar)
+
 [![Release](https://img.shields.io/github/v/release/Al-rimi/Timetable-to-Calendar)](https://github.com/Al-rimi/Timetable-to-Calendar/releases)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-2ea44f)
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -29,6 +31,8 @@ Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalend
 | ------- | -------------------- |
 | macOS   | [Download][mac-dl]   |
 | Linux   | [Download][linux-dl] |
+
+<p><em>China: use the <a href="https://gitee.com/al-rimi/Timetable-to-Calendar">Gitee mirror</a> for faster downloads.</em></p>
 
 </div>
 
