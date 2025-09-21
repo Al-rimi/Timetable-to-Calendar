@@ -674,10 +674,6 @@ def merge_continuation_rows(headers: list[str], rows: list[list[str]]) -> list[l
     # Track last non-empty row index per day column
     last_nonempty_in_col: dict[int, int | None] = {j: None for j in day_cols}
     for i, r in enumerate(out):
-        # Update tracker before handling continuation: remember latest non-empty per day column
-        for j in day_cols:
-            if (r[j] or "").strip():
-                last_nonempty_in_col[j] = i
         # If this looks like a continuation row (no period/section)
         p = (r[col_period] or "").strip()
         s = (r[col_section] or "").strip()
@@ -706,6 +702,12 @@ def merge_continuation_rows(headers: list[str], rows: list[list[str]]) -> list[l
             # If we consumed all day columns, drop this row by marking a tombstone
             if changed and all((out[i][j] or "").strip() == "" for j in day_cols) and p == "" and s == "":
                 out[i] = None
+            # Do NOT update tracker on pure continuation rows; continue to next row
+            continue
+        # Non-continuation row: update tracker after handling continuation logic
+        for j in day_cols:
+            if (r[j] or "").strip():
+                last_nonempty_in_col[j] = i
     # Compact rows removing None
     out2 = [r for r in out if r is not None]
     return out2

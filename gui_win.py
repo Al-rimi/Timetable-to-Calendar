@@ -521,6 +521,11 @@ class App(ttk.Frame):
         # Courses table and editor
         self.courses_pane = CoursesPane(self, self.tr)
         self.courses_pane.grid(row=3, column=0, columnspan=4, sticky="nsew", pady=(12, 0))
+        # Initialize day display locale to UI language (updated after analyze)
+        try:
+            self.courses_pane.set_day_locale(self.lang, False)
+        except Exception:
+            pass
         # Footer actions: left (open folder + share), right (generate)
         actions = ttk.Frame(self)
         actions.grid(row=4, column=0, sticky="we", pady=(8, 0))
@@ -752,6 +757,11 @@ class App(ttk.Frame):
             pass
         self._last_courses = courses
         self._last_is_chinese = is_chinese
+        # Update day display locale: Chinese if UI is zh OR timetable is Chinese; else French if UI is fr; else English
+        try:
+            self.courses_pane.set_day_locale(self.lang, is_chinese)
+        except Exception:
+            pass
         # Student info + term
         try:
             info = app.extract_student_info_from_pdf(pdf, meta)
@@ -1052,6 +1062,7 @@ class CoursesPane(ttk.Frame):
     def __init__(self, master: tk.Misc, tr: dict[str, object]):
         super().__init__(master, padding=8)
         self.tr = tr
+        self._day_locale: Lang = "en"  # how to display day names
         # Table
         table_frame = ttk.LabelFrame(self, text=str(tr.get("courses", "Courses")), padding=8)
         table_frame.pack(fill=tk.BOTH, expand=True)
@@ -1088,8 +1099,8 @@ class CoursesPane(ttk.Frame):
         self.tree.bind("<Configure>", self._auto_size_columns, add=True)
         # Column size config: relative weights used by auto sizer
         self._col_weight = {
-            "include": 0.6, "day": 0.8, "name": 4.0, "type": 1.2,
-            "session": 0.8, "location": 2.6, "weeks": 1.2, "teacher": 2.0,
+            "include": 0.9, "day": 1.2, "name": 4.0, "type": 1.0,
+            "session": 0.9, "location": 1.2, "weeks": 1.2, "teacher": 1.0,
         }
         # Select/deselect all
         btns = ttk.Frame(table_frame)
@@ -1178,9 +1189,10 @@ class CoursesPane(ttk.Frame):
         if not self._courses:
             return
         for c in self._courses:
+            disp_day = self._display_day(c.get("day") or "")
             row = (
                 "✔" if c.get("include", True) else "✖",
-                (c.get("day") or ""),
+                disp_day,
                 c.get("name", ""),
                 c.get("type", ""),
                 self._periods_to_session(c.get("periods") or []),
@@ -1396,8 +1408,44 @@ class CoursesPane(ttk.Frame):
             "fri": "Fri", "friday": "Fri", "周五": "Fri", "星期五": "Fri",
             "sat": "Sat", "saturday": "Sat", "周六": "Sat", "星期六": "Sat",
             "sun": "Sun", "sunday": "Sun", "周日": "Sun", "星期日": "Sun",
+            # French full/abbr
+            "lundi": "Mon", "lun": "Mon", "lun.": "Mon",
+            "mardi": "Tue", "mar": "Tue", "mar.": "Tue",
+            "mercredi": "Wed", "mer": "Wed", "mer.": "Wed",
+            "jeudi": "Thu", "jeu": "Thu", "jeu.": "Thu",
+            "vendredi": "Fri", "ven": "Fri", "ven.": "Fri",
+            "samedi": "Sat", "sam": "Sat", "sam.": "Sat",
+            "dimanche": "Sun", "dim": "Sun", "dim.": "Sun",
         }
         return mapping.get(t)
+
+    # --- Day display localization ---
+    def set_day_locale(self, ui_lang: Lang, timetable_is_chinese: bool) -> None:
+        # If UI is Chinese OR timetable is Chinese → display Chinese.
+        # Else if UI is French → display French. Else English.
+        if ui_lang == "zh" or timetable_is_chinese:
+            self._day_locale = "zh"
+        elif ui_lang == "fr":
+            self._day_locale = "fr"
+        else:
+            self._day_locale = "en"
+        try:
+            self._refresh_table()
+        except Exception:
+            pass
+
+    def _display_day(self, canon: str) -> str:
+        c = (canon or "").strip()
+        if not c:
+            return ""
+        # Canonical → localized
+        if self._day_locale == "zh":
+            mapping = {"Mon": "星期一", "Tue": "星期二", "Wed": "星期三", "Thu": "星期四", "Fri": "星期五", "Sat": "星期六", "Sun": "星期日"}
+        elif self._day_locale == "fr":
+            mapping = {"Mon": "Lundi", "Tue": "Mardi", "Wed": "Mercredi", "Thu": "Jeudi", "Fri": "Vendredi", "Sat": "Samedi", "Sun": "Dimanche"}
+        else:
+            mapping = {"Mon": "Monday", "Tue": "Tuesday", "Wed": "Wednesday", "Thu": "Thursday", "Fri": "Friday", "Sat": "Saturday", "Sun": "Sunday"}
+        return mapping.get(c, c)
 
 
 

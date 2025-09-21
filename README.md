@@ -135,24 +135,37 @@ build_ics(courses, monday_date, output_path,
   ```
   The CLI is interactive: it prompts for the PDF path and the Week 1 Monday date, then writes the `.ics` next to the PDF.
 
-## Build
+## Build (Windows)
 
-Build a self‑contained app for your platform using PyInstaller.
+Quick local build producing `dist/Timetable to Calendar ZJNU.exe` with icon and version info:
 
-- Windows (single EXE, tuned to reduce AV flags):
+```powershell
+# From repo root
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\build.ps1
+```
 
-  ```pwsh
-  # 1) Create a clean virtual environment (optional but recommended)
-  py -3 -m venv .venv
-  .\.venv\Scripts\Activate.ps1
-  pip install --upgrade pip wheel
-  pip install -r requirements.txt pyinstaller
+Options:
 
-  # 2) Build using the provided spec (UPX disabled, console off)
-  pyinstaller --noconfirm gui_win.spec
+- OneDir (may reduce AV false positives and ease debugging):
 
-  # 3) Output: dist/Timetable to Calendar ZJNU.exe
-  ```
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\build.ps1 -OneDir
+```
+
+- Clean artifacts and rebuild:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Clean
+```
+
+VS Code: Run task "Build: Windows (onefile)" (Terminal → Run Task) or choose the onedir/clean variants.
+
+The build script will:
+
+- Create/upgrade a local venv at `.venv`
+- Install deps from `requirements.txt` and `pyinstaller`
+- Generate Windows version info from `pyproject.toml`
+- Build using `gui_win.spec`
 
 - macOS (app bundle, unsigned):
   ```bash

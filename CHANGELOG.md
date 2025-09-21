@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and the versioning follows SemVer while we are in early prototype stage.
 
+## [1.0.1] - 2025-09-22
+
+Parsing, Windows metadata, and repeatable builds
+
+- Parsing robustness:
+  - Fixed continuation-row merging so multi-line fragments (Campus/Area/Building/Room/Teacher) attach to the correct course block. This resolves locations like "20-206软件实验室", "16-428" that previously degraded to partial values (e.g., just "Main").
+  - Improved block parsing to reduce mis-association of teacher/location lines and to preserve Unicode consistently.
+- Windows EXE metadata:
+  - Added a generator `tools/generate_version_info.py` that reads `pyproject.toml` and emits `build/version_info.txt` consumed by PyInstaller.
+  - Embedded Company, Product, Description, Version, Homepage (Comments), and Copyright into the EXE.
+  - Updated `gui_win.spec` to reference the generated version resource and keep icon embedding.
+- Build quality of life:
+  - New PowerShell script `scripts/build.ps1` to create/upgrade a local venv, install deps (including `pyinstaller`), generate version info, and build via the spec.
+  - Added VS Code tasks to run one-file/one-dir builds and a clean target.
+  - README updated with short, copyable Windows build commands and task usage.
+- Smart App Control guidance:
+  - Documented options to reduce false positives (metadata, avoiding UPX, trying onedir) and recommended Authenticode signing for trusted distribution.
+
 ## [1.0.0] - 2025-09-21
 
 Modernized Windows GUI and UX polish

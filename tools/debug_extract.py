@@ -16,6 +16,11 @@ def main(pdf_path: str):
         print("No header detected.")
         return
     headers, rows, meta, notes, is_chinese = header
+    # Merge continuation rows to attach Campus/Area/Teacher fragments to the correct cells
+    try:
+        rows = core.merge_continuation_rows(headers, rows)
+    except Exception:
+        pass
     print(f"Header cols: {len(headers)} | Chinese: {is_chinese}")
     print("-- Metadata lines (top) --")
     for i, line in enumerate(meta[:20], 1):
