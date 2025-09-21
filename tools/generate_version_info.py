@@ -107,7 +107,8 @@ def main() -> int:
   out_dir.mkdir(parents=True, exist_ok=True)
   out_file = out_dir / 'version_info.txt'
   out_file.write_text(content, encoding='utf-8')
-  print(f"Wrote version info → {out_file}")
+  # Use ASCII-only output for CI consoles on Windows
+  print(f"Wrote version info -> {out_file}")
   return 0
 
 
