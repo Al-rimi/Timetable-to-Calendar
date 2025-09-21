@@ -1,10 +1,10 @@
-name: build
+name: Build desktop apps
 
 on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*"
 
 jobs:
   build:
@@ -22,16 +22,21 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.13"
+
+      - name: Install system Tk (Ubuntu)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pyinstaller tomli
-        shell: bash
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
 
-      - name: Generate version info (Windows-only)
+      - name: Generate version info (Windows)
         if: startsWith(matrix.os, 'windows')
         run: |
           python tools/generate_version_info.py
@@ -41,14 +46,15 @@ jobs:
         run: |
           pyinstaller gui_win.spec --noconfirm
 
-      - name: Build (Linux/macOS)
-        if: startsWith(matrix.os, 'ubuntu') || startsWith(matrix.os, 'macos')
+      - name: Build (macOS)
+        if: startsWith(matrix.os, 'macos')
         run: |
-          pyinstaller --noconfirm --windowed --name "Timetable to Calendar ZJNU" \
-            --add-data "assets/icon.ico:assets" \
-            --hidden-import timetable_to_calendar_zjnu \
-            --icon assets/icon.ico \
-            gui_win.py
+          pyinstaller --noconfirm --windowed --name "Timetable to Calendar ZJNU" gui_win.py
+
+      - name: Build (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          pyinstaller --noconfirm --noconsole --onefile --name "timetable-to-calendar-zjnu" gui_win.py
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v4
@@ -75,78 +81,3 @@ jobs:
           files: artifacts/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-name: Build desktop apps
-
-on:
-  workflow_dispatch:
-  push:
-    tags:
-      - "v*"
-
-jobs:
-  windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
-      - name: Build EXE (PyInstaller)
-        run: |
-          pyinstaller --noconfirm gui_win.spec
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-exe
-          path: dist/Timetable to Calendar ZJNU.exe
-
-  macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller
-      - name: Build .app (PyInstaller)
-        run: |
-          # Build a windowed app bundle; icon omitted (expects .icns)
-          pyinstaller --noconfirm --windowed --name "Timetable to Calendar ZJNU" gui_win.py
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-app
-          path: |
-            dist/Timetable to Calendar ZJNU.app
-            dist/Timetable to Calendar ZJNU
-
-  linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - name: Install system Tk (for _tkinter)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-tk
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller
-      - name: Build ELF (PyInstaller)
-        run: |
-          pyinstaller --noconfirm --noconsole --onefile --name "timetable-to-calendar-zjnu" gui_win.py
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-binary
-          path: dist/timetable-to-calendar-zjnu
