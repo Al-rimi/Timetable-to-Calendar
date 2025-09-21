@@ -247,6 +247,8 @@ def parse_weeks(weeks_text: str) -> list[int]:
     weeks = set()
     if not weeks_text:
         return []
+    # Normalize Chinese comma to ASCII comma
+    weeks_text = weeks_text.replace("，", ",")
     for part in re.split(r",", weeks_text):
         part = part.strip()
         if not part:
@@ -316,15 +318,14 @@ def split_blocks_by_marker(cell_text: str) -> list[str]:
     markers = list(re.finditer(r"[△★▲☆]", text))
     if not markers:
         return []
-    # Start of each block is at the position of a marker, but we want to include the name preceding it
-    # So we start from the beginning of the text and cut right before each subsequent marker
-    starts = [0]
-    for m in markers[1:]:
-        starts.append(m.start())
+    # Start each block exactly at marker positions; ignore any leading pre-marker noise
+    idxs = [m.start() for m in markers]
     blocks: list[str] = []
-    for i, st in enumerate(starts):
-        en = starts[i + 1] if i + 1 < len(starts) else len(text)
-        blocks.append(text[st:en].strip())
+    for i, st in enumerate(idxs):
+        en = idxs[i + 1] if i + 1 < len(idxs) else len(text)
+        seg = text[st:en].strip()
+        if seg:
+            blocks.append(seg)
     return [b for b in blocks if b]
 
 
@@ -363,8 +364,8 @@ def parse_block_text(block_text: str, fallback_period: int | None) -> dict | Non
             return True
         if re.search(r"(校区|教学区|地点|上课地点|场地|任课教师|教师|老师)\s*[:：]", ln):
             return True
-        # Other metadata lines found in PDFs
-        if re.search(r"^(The class|The makeup of the class|Class selection remarks|Course\s*hours|Week\s*period|Credit)\s*[:：]", ln, flags=re.IGNORECASE):
+        # Other metadata lines found in PDFs (match anywhere, not only at start, to catch '/The class:')
+        if re.search(r"(?:^|/|\s)(The class|The makeup of the class|Class selection remarks|Course\s*hours|Week\s*period|Credit)\s*[:：]", ln, flags=re.IGNORECASE):
             return True
         # Broken lines where 'Week' split from 'period', or 'hours' alone
         if re.search(r"^(?:Week\s*)?period\s*[:：]", ln, flags=re.IGNORECASE):
@@ -465,7 +466,8 @@ def parse_block_text(block_text: str, fallback_period: int | None) -> dict | Non
         if m_place:
             place = m_place.group(2).strip()
         if campus and place:
-            loc = f"{campus} {place}".strip()
+            # Prefer the specific place/room; omit campus prefix
+            loc = place
         elif place:
             loc = place
         elif campus:
@@ -541,6 +543,8 @@ def parse_block_text(block_text: str, fallback_period: int | None) -> dict | Non
     # As a small cleanup, drop trailing icon hints or extra labels
     if teacher:
         teacher = re.sub(r"\s*[|/;].*$", "", teacher).strip()
+        # Collapse spaces between CJK characters (e.g., '吴 剑明' -> '吴剑明')
+        teacher = re.sub(r"([\u4e00-\u9fff])\s+([\u4e00-\u9fff])", r"\1\2", teacher)
         # Normalize camel-case English names without spaces (e.g., WangZiYe -> Wang Zi Ye)
         if not re.search(r"[\u4e00-\u9fff]", teacher) and not re.search(r"\s", teacher):
             parts = re.findall(r"[A-Z][a-z]*|[A-Z]+(?![a-z])|[a-z]+", teacher)
@@ -565,6 +569,19 @@ def parse_block_text(block_text: str, fallback_period: int | None) -> dict | Non
                     if name_raw.endswith(" " + tok):
                         name_raw = name_raw[: -len(tok)-1]
                         changed = True
+    else:
+        # Fallback: infer teacher from a plausible trailing name line without explicit label
+        # Prefer Chinese name lines; else English short name lines
+        for ln in reversed(lines):
+            lns = (ln or "").strip()
+            if not lns:
+                continue
+            # Skip metadata/location/type/marker lines
+            if re.search(r"[△★▲☆]|周|节|校区|地点|场地|上课地点|实验|理论|技术|实践|Campus|Area|Teacher|Week|Credit", lns, flags=re.IGNORECASE):
+                continue
+            if is_probable_name_line_cn(lns) or is_probable_name_line_en(lns):
+                teacher = lns
+                break
     # Clean up name: remove any metadata tokens if accidentally included (English & Chinese)
     name_raw = re.sub(r"\b(Campus|Area|Teacher|Week)\s*[:：].*$", "", name_raw).strip()
     name_raw = re.sub(r"(校区|教学区|地点|上课地点|场地|任课教师|教师|老师)\s*[:：].*$", "", name_raw).strip()
@@ -582,7 +599,7 @@ def parse_block_text(block_text: str, fallback_period: int | None) -> dict | Non
     # Fallback: if name became empty after cleanup, restore original marker-line name
     if not name_raw:
         name_raw = original_name_raw.strip()
-    course_name = (name_raw + " " + TYPE_MAP.get(type_char, "")).strip()
+    course_name = name_raw.strip()
     return {
         "name": course_name,
         "periods": periods,
@@ -655,9 +672,9 @@ def merge_continuation_rows(headers: list[str], rows: list[list[str]]) -> list[l
     day_cols = [i for i in range(2, len(headers))]
     out = [r[:] for r in rows]
     # Track last non-empty row index per day column
-    last_nonempty_in_col = {j: None for j in day_cols}
+    last_nonempty_in_col: dict[int, int | None] = {j: None for j in day_cols}
     for i, r in enumerate(out):
-        # Update tracker before handling continuation
+        # Update tracker before handling continuation: remember latest non-empty per day column
         for j in day_cols:
             if (r[j] or "").strip():
                 last_nonempty_in_col[j] = i
@@ -671,12 +688,14 @@ def merge_continuation_rows(headers: list[str], rows: list[list[str]]) -> list[l
                 if not frag:
                     continue
                 # Typical fragments start with Campus/Area/Teachers/Week; accept any text
-                prev_idx = None
-                # Find previous row above with non-empty same column within a window
-                for k in range(i - 1, max(-1, i - 6), -1):
-                    if (out[k][j] or "").strip():
-                        prev_idx = k
-                        break
+                # Prefer the tracked last non-empty row for this column
+                prev_idx = last_nonempty_in_col.get(j)
+                # Safety net: if tracker is None (e.g., edge cases), scan a larger window
+                if prev_idx is None:
+                    for k in range(i - 1, max(-1, i - 20), -1):
+                        if (out[k][j] or "").strip():
+                            prev_idx = k
+                            break
                 if prev_idx is not None:
                     # Append with newline
                     base = out[prev_idx][j].rstrip()
@@ -708,6 +727,77 @@ def extract_student_info(metadata_lines: list[str]) -> dict:
         m2 = re.search(r"\b(Name|姓名)\s*:\s*([A-Za-z\u4e00-\u9fff\s.]{2,})", s)
         if m2 and not info["name"]:
             info["name"] = " ".join(m2.group(2).split())
+        # English header lines where term/ID is injected before 's Curriculum
+        if not info["name"] and re.search(r"\bCurriculum\b", s, flags=re.IGNORECASE) and "'s" in s:
+            pre = re.split(r"'s\b", s, maxsplit=1, flags=re.IGNORECASE)[0]
+            x = pre
+            # Normalize dashes/fullwidth digits
+            dash_chars = "\u2010\u2011\u2012\u2013\u2014\u2212\ufe63\uff0d"
+            trans = {ord(ch): '-' for ch in dash_chars}
+            for i in range(10):
+                trans[0xFF10 + i] = ord('0') + i
+            x = x.translate(trans)
+            # Remove academic year phrases like '2025-2026 academic year 1 term'
+            x = re.sub(r"\b\d{4}-\d{4}\b.*?academic\s*year\s*[1-2]\s*term", " ", x, flags=re.IGNORECASE)
+            # Remove 'student ID: XXXXX'
+            x = re.sub(r"\bstudent\s*id\s*:\s*[A-Za-z0-9_-]+", " ", x, flags=re.IGNORECASE)
+            # Collapse spaces and trim
+            cand = " ".join(x.split()).strip(" -:·.")
+            if cand:
+                info["name"] = cand
+        # Chinese title header: <NAME>课表 or <NAME>课程表
+        if not info["name"]:
+            mtc = re.search(r"^\s*([A-Za-z\u4e00-\u9fff][A-Za-z\u4e00-\u9fff\s.\-']{1,}?)\s*(?:课表|课程表)\s*$", s)
+            if mtc:
+                info["name"] = " ".join(mtc.group(1).split())
+    return info
+
+
+def extract_student_info_from_pdf(pdf_path: str, metadata_lines: list[str]) -> dict:
+    """Extract student info using metadata lines first, then fallback to scanning PDF text.
+
+    Handles title headers such as "<NAME>'s Curriculum" (EN) and "<NAME>课表/课程表" (CN)
+    that may not be part of table metadata rows.
+    """
+    info = extract_student_info(metadata_lines or [])
+    if info.get("name"):
+        return info
+    # Fallback: scan first 2 pages text
+    try:
+        import pdfplumber  # type: ignore
+        with pdfplumber.open(pdf_path) as pdf:
+            pages = [p for i, p in enumerate(pdf.pages) if i < 2]
+            for p in pages:
+                txt = p.extract_text() or ""
+                # Normalize colons and spaces
+                lines = [l.strip() for l in txt.splitlines() if l.strip()]
+                for s in lines:
+                    if info.get("name"):
+                        break
+                    # English header: <NAME>'s … Curriculum (with possible injected term/ID)
+                    if re.search(r"\bCurriculum\b", s, flags=re.IGNORECASE) and "'s" in s:
+                        pre = re.split(r"'s\b", s, maxsplit=1, flags=re.IGNORECASE)[0]
+                        x = pre
+                        dash_chars = "\u2010\u2011\u2012\u2013\u2014\u2212\ufe63\uff0d"
+                        trans = {ord(ch): '-' for ch in dash_chars}
+                        for i in range(10):
+                            trans[0xFF10 + i] = ord('0') + i
+                        x = x.translate(trans)
+                        x = re.sub(r"\b\d{4}-\d{4}\b.*?academic\s*year\s*[1-2]\s*term", " ", x, flags=re.IGNORECASE)
+                        x = re.sub(r"\bstudent\s*id\s*:\s*[A-Za-z0-9_-]+", " ", x, flags=re.IGNORECASE)
+                        cand = " ".join(x.split()).strip(" -:·.")
+                        if cand:
+                            info["name"] = cand
+                            break
+                    # Chinese header: <NAME>课表 or <NAME>课程表
+                    m_cn = re.search(r"^\s*([A-Za-z\u4e00-\u9fff][A-Za-z\u4e00-\u9fff\s.\-']{1,}?)\s*(?:课表|课程表)\s*$", s)
+                    if m_cn and not info.get("name"):
+                        info["name"] = " ".join(m_cn.group(1).split())
+                        break
+                if info.get("name"):
+                    break
+    except Exception:
+        pass
     return info
 
 
@@ -716,6 +806,83 @@ def extract_term_from_pdf(pdf_path: str) -> str | None:
     base = os.path.splitext(os.path.basename(pdf_path or ""))[0]
     m = re.search(r"(\d{4}-\d{4}-\d)", base)
     return m.group(1) if m else None
+
+
+def extract_term_from_content(pdf_path: str, metadata_lines: list[str]) -> str | None:
+    """Extract academic term (YYYY-YYYY-N) from content: metadata first, then page text.
+
+    Handles Unicode dashes and CN/EN phrasing like:
+    - 2025-2026-1
+    - 2025‑2026 academic year 1 term
+    - 2025‑2026学年第1学期
+    """
+    def norm(s: str) -> str:
+        if not s:
+            return ""
+        dash_chars = "\u2010\u2011\u2012\u2013\u2014\u2212\ufe63\uff0d"
+        trans = {ord(ch): '-' for ch in dash_chars}
+        for i in range(10):
+            trans[0xFF10 + i] = ord('0') + i
+        return s.translate(trans)
+
+    def from_text_list(lines: list[str]) -> str | None:
+        pat_direct = re.compile(r"(\d{4})-(\d{4})-([1-2])")
+        pat_en = re.compile(r"(\d{4})-(\d{4}).{0,8}academic\s*year\s*([1-2])\s*term", re.IGNORECASE)
+        pat_cn = re.compile(r"(\d{4})-(\d{4})\s*学年\s*第\s*([一二三123])\s*学期")
+        cn_map = {"一": "1", "二": "2", "三": "3"}
+        for raw in lines or []:
+            s = norm(raw)
+            m = pat_direct.search(s)
+            if m:
+                return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+            m = pat_en.search(s)
+            if m:
+                return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+            m = pat_cn.search(s)
+            if m:
+                sem = cn_map.get(m.group(3), m.group(3))
+                if sem in ("1", "2"):
+                    return f"{m.group(1)}-{m.group(2)}-{sem}"
+        return None
+
+    # 1) Metadata lines
+    term = from_text_list(metadata_lines or [])
+    if term:
+        return term
+    # 2) Fallback: scan first 2 pages text
+    try:
+        import pdfplumber  # type: ignore
+        with pdfplumber.open(pdf_path) as pdf:
+            lines: list[str] = []
+            for i, p in enumerate(pdf.pages):
+                if i >= 2:
+                    break
+                txt = p.extract_text() or ""
+                lines.extend([l.strip() for l in txt.splitlines() if l.strip()])
+        return from_text_list(lines)
+    except Exception:
+        return None
+
+
+def safe_filename(name: str) -> str:
+    """Return a filesystem-safe filename keeping spaces and CJK; strip illegal chars."""
+    s = (name or "").strip()
+    # Remove illegal Windows filename characters and control chars
+    s = re.sub(r'[<>:"/\\|?*]', '', s)
+    s = re.sub(r'[\x00-\x1F]', '', s)
+    # Collapse spaces
+    s = ' '.join(s.split())
+    return s or 'Timetable'
+
+
+def compute_ics_output_path(pdf_path: str, metadata_lines: list[str], monday_date: str) -> tuple[str, str]:
+    """Compute ICS output path and calendar name '<StudentName> <Term>'."""
+    pdf_dir = os.path.dirname(os.path.abspath(pdf_path))
+    student_full = extract_student_info_from_pdf(pdf_path, metadata_lines)
+    student_name = (student_full.get("name") or "").strip()
+    term_str = extract_term_from_content(pdf_path, metadata_lines) or derive_term_from_monday(monday_date)
+    base = safe_filename(f"{student_name} {term_str}" if student_name and term_str else (student_name or term_str or os.path.splitext(os.path.basename(pdf_path))[0]))
+    return os.path.join(pdf_dir, f"{base}.ics"), base
 
 
 def derive_term_from_monday(monday_date: str) -> str:
@@ -745,7 +912,7 @@ def parse_block(block_lines: list[str], fallback_period: int | None) -> dict | N
         return None
     name_raw = m.group(1).strip()
     type_char = m.group(2)
-    course_name = name_raw + " " + TYPE_MAP.get(type_char, "")
+    course_name = name_raw
     # Section(s)
     sec_m = re.search(r"\((\d+)(?:-(\d+))?\s*Section\)", joined)
     if sec_m:
@@ -773,6 +940,7 @@ def parse_block(block_lines: list[str], fallback_period: int | None) -> dict | N
         "weeks": weeks,
         "location": loc or "",
         "teacher": teacher,
+        "type": TYPE_MAP.get(type_char, ""),
     }
 
 
@@ -848,6 +1016,28 @@ def extract_courses_from_table(headers: list[str], rows: list[list[str]], preser
     return courses
 
 
+def _backfill_teachers(courses: list[dict]) -> None:
+    """Propagate known teacher names to identical sessions missing teacher.
+
+    Group by (name, day, periods span). If any item in the group has a teacher,
+    copy it to others with empty teacher. Do not touch locations.
+    """
+    groups: dict[tuple[str, str], list[int]] = {}
+    for i, c in enumerate(courses or []):
+        name = (c.get("name") or "").strip()
+        day = (c.get("day") or "").strip()
+        key = (name, day)
+        groups.setdefault(key, []).append(i)
+    for key, idxs in groups.items():
+        teachers = [ (courses[i].get("teacher") or "").strip() for i in idxs if (courses[i].get("teacher") or "").strip() ]
+        if not teachers:
+            continue
+        t = teachers[0]
+        for i in idxs:
+            if not (courses[i].get("teacher") or "").strip():
+                courses[i]["teacher"] = t
+
+
 def extract_outside_courses(metadata_lines: list[str]) -> list[dict]:
     courses: list[dict] = []
     for line in metadata_lines:
@@ -917,7 +1107,7 @@ def extract_outside_courses(metadata_lines: list[str]) -> list[dict]:
                     loc = "Online"
         # Append course
         courses.append({
-            "name": base + " " + TYPE_MAP.get(type_char, ""),
+            "name": base,
             "teacher": teacher,
             "weeks": weeks or [],
             "location": loc or "",
@@ -994,7 +1184,8 @@ def build_ics(
                 start_dt = naive
                 end_dt = start_dt + timedelta(hours=1)
                 ev = Event()
-                ev.name = name
+                disp = f"{name} {course.get('type','').strip()}".strip()
+                ev.name = disp
                 ev.begin = start_dt
                 ev.end = end_dt
                 # Default to Online location for outside items when missing
@@ -1024,7 +1215,8 @@ def build_ics(
             start_dt = naive_start
             end_dt = naive_end
             ev = Event()
-            ev.name = name
+            disp = f"{name} {course.get('type','').strip()}".strip()
+            ev.name = disp
             ev.begin = start_dt
             ev.end = end_dt
             # In-table empty location → Not yet/未定
@@ -1215,12 +1407,10 @@ def main() -> None:
             name = os.path.splitext(os.path.basename(ics_path))[0]
         return name
 
-    # Determine output .ics path in the same directory as the PDF
-    pdf_dir = os.path.dirname(os.path.abspath(pdf_path))
-    pdf_stem = os.path.splitext(os.path.basename(pdf_path))[0]
-    ics_output = os.path.join(pdf_dir, f"{pdf_stem.replace(' ', '_')}.ics")
+    # Determine output .ics path '<StudentName> <Term>.ics' beside the PDF
+    ics_output, base = compute_ics_output_path(pdf_path, meta, monday_str)
 
-    cal_name = derive_calendar_name(pdf_path, ics_output)
+    cal_name = base
     cal_desc = f"Generated timetable starting Monday {monday_str}"
 
     # Use student ID for ASCII-only fields where names may contain Chinese.
@@ -1229,7 +1419,7 @@ def main() -> None:
     student_id = student.get("id")
 
     # Determine term for UID domain tagging
-    term = extract_term_from_pdf(pdf_path) or derive_term_from_monday(monday_str)
+    term = extract_term_from_content(pdf_path, meta) or derive_term_from_monday(monday_str)
     term_ascii = re.sub(r"[^0-9-]", "", term or "")
 
     # Build ICS (respect chosen tz-mode; default remains floating for exact times across apps)

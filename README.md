@@ -10,7 +10,7 @@
 
 </div>
 
-Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalendar (.ics) files that import cleanly into all major calendar apps. Note: extracting courses from PDFs consumes unnecessary CPU/memory and adds failure points. The same page that generates the PDF already has structured timetable data from the database. The efficient solution is to produce the .ics directly from that data.
+Convert ZJNU timetable PDFs (English/Chinese) into standards‑compliant iCalendar (.ics) files that import cleanly into all major calendar apps.
 
 ## Why Calendars, Not Timetables
 
@@ -139,10 +139,21 @@ build_ics(courses, monday_date, output_path,
 
 Build a self‑contained app for your platform using PyInstaller.
 
-- Windows (one‑file EXE):
+- Windows (single EXE, tuned to reduce AV flags):
+
   ```pwsh
+  # 1) Create a clean virtual environment (optional but recommended)
+  py -3 -m venv .venv
+  .\.venv\Scripts\Activate.ps1
+  pip install --upgrade pip wheel
+  pip install -r requirements.txt pyinstaller
+
+  # 2) Build using the provided spec (UPX disabled, console off)
   pyinstaller --noconfirm gui_win.spec
+
+  # 3) Output: dist/Timetable to Calendar ZJNU.exe
   ```
+
 - macOS (app bundle, unsigned):
   ```bash
   pyinstaller --noconfirm --windowed --name "Timetable to Calendar ZJNU" gui_win.py
@@ -154,6 +165,7 @@ Build a self‑contained app for your platform using PyInstaller.
   ```
 
 Notes
+
 - Requires Python 3.10+.
 - On Linux/macOS, ensure Tk is available (e.g., `python3-tk` on Debian/Ubuntu).
 - Binaries are unsigned; first‑run prompts may appear on some systems.
@@ -174,10 +186,8 @@ Notes
   - Distribute the `.app` (or a signed `.dmg`) to avoid Gatekeeper blocks.
 - Linux
   - Provide `.AppImage` or `.tar.gz` plus a detached signature (GPG or `cosign`) and published checksums.
-  
-These steps are optional for development, but recommended for sharing executables widely without false positives.
 
- 
+These steps are optional for development, but recommended for sharing executables widely without false positives.
 
 ## License & Disclaimer
 
@@ -189,3 +199,66 @@ These steps are optional for development, but recommended for sharing executable
 [win-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/v0.0.3/Timetable.to.Calendar.ZJNU.exe
 [mac-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/v0.0.3/Timetable.to.Calendar.ZJNU.app.zip
 [linux-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/v0.0.3/timetable-to-calendar-zjnu.tar.gz
+
+## Debugging & Dev Tools
+
+- Always‑on course summary (CLI): running `timetable_to_calendar_zjnu.py` prints a detailed breakdown of detected courses (day, sections, weeks, location, teacher). Use this to validate parsing.
+- GUI inline edits: double‑click a cell in the table to edit Day/Session/Weeks/Name/Type/Location/Teacher. The ICS reflects your edits.
+- Sorting: the table enforces Monday→Sunday order. If a day looks wrong, fix the “Day” cell; the row will re‑sort automatically.
+- Term/Monday date: the GUI infers known terms (e.g., 2025‑2026‑1 ⇒ 2025‑09‑08) and prompts a date picker if unknown.
+- Theme: Windows dark mode changes are detected at runtime; the UI adjusts automatically.
+
+Tip: For deeper analysis, add prints in `timetable_to_calendar_zjnu.py` (e.g., around `extract_courses_from_table`) and run the CLI. The generated `.ics` is normalized with headers, CRLF line endings, and `DTSTAMP` for each event so you can diff cleanly.
+
+## Testing & Debugging Tools
+
+Two helper scripts live under `tools/` to validate parsing and ICS generation without the GUI.
+
+- `tools/debug_extract.py`: Deep dive into a single PDF
+
+  - What it does: prints detected header metadata, raw non-empty table cells per weekday, the block splits inside cells, and the final parsed courses list (table + outside items). Also shows extracted student name/ID and term.
+  - Run (PowerShell):
+    ```pwsh
+    # Activate venv if you use one
+    .\.venv\Scripts\Activate.ps1  # optional
+    python tools/debug_extract.py "samples/AL RAIMI ABDULLAH(2025-2026-1)课表 EN.pdf"
+    ```
+  - Look for:
+    - "-- Extracted --" section with Name/ID/Term
+    - "-- Table cells (non-empty) --" with block breakdowns
+    - "-- Parsed courses (table) --" lines showing day, periods, time spans, weeks, teacher, location
+
+- `tools/smoke_test.py`: End-to-end ICS smoke test
+  - What it does: parses a sample PDF, prints a concise course summary, and writes an `.ics` (floating time) under `samples/`.
+  - Run (PowerShell):
+    ```pwsh
+    # Activate venv if you use one
+    .\.venv\Scripts\Activate.ps1  # optional
+    python tools/smoke_test.py
+    ```
+  - Expected output: a final line like `Wrote: samples/AL_RAIMI_ABDULLAH(2025-2026-1)课表_EN.smoke.ics exists: True size: <bytes>`
+
+Tip: If parsing looks off, compare the raw cell dumps and the parsed courses to spot where a split/merge heuristic needs tuning.
+
+## Packaging via pyproject (sdist/wheel)
+
+You can build pip-installable artifacts using `pyproject.toml`.
+
+```pwsh
+# In a clean environment
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip build
+
+# Build source distribution and wheel into dist/
+python -m build
+
+# (Optional) Install locally to test CLI entry points
+pip install --force-reinstall dist\timetable_to_calendar_zjnu-*.whl
+
+# Now you can run the scripts defined in pyproject:
+zjnu-ics        # CLI
+zjnu-ics-gui    # GUI
+```
+
+This uses `[project]` and `[project.scripts]` from `pyproject.toml`, keeping packaging metadata in one place.

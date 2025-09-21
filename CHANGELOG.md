@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and the versioning follows SemVer while we are in early prototype stage.
 
+## [1.0.0] - 2025-09-21
+
+Modernized Windows GUI and UX polish
+
+- Multilingual UI (EN/中文/FR) with automatic language detection.
+- Windows dark mode support with live switching at runtime; uses native title bar.
+- Redesigned minimal layout: big “Choose PDF or Drag & Drop” button; filename hidden in favor of student name + term.
+- Content‑based ICS naming: extracts student name and term from the PDF and writes “<Student Name> <Term>.ics”.
+- Courses table enhancements:
+  - Inline editing (Include, Day, Name, Type, Session, Location, Weeks, Teacher).
+  - Monday→Sunday sorting and by period within each day.
+  - Proportional column auto‑sizing so the entire table fits (no scrollbars).
+- Footer actions: “Open folder” and “Copy” on the left; “Generate Calendar” on the right.
+- “Copy” uses Windows clipboard CF_HDROP to share the generated `.ics` (paste directly into apps like WeChat). Shows a brief “Copied! Paste into anywhere” confirmation.
+- “Generate ICS” renamed to “Generate Calendar” and stays disabled until a PDF is selected/dropped and analysis succeeds.
+
+Packaging
+
+- Windows build includes conversion module and assets in the bundle to fix a startup “does nothing” report when selecting a PDF (adds `timetable_to_calendar_zjnu` to `hiddenimports` and `assets/icon.ico` to `datas`).
+
+Build
+
+- Kept `gui_win.spec` minimal with `upx=False` to reduce antivirus false positives.
+- README updated with build steps and safe distribution guidance.
+
 ## [v0.0.4] - 2025-09-20
 
 Safer distribution

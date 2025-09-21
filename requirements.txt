@@ -1,3 +1,4 @@
 pdfplumber
 ics
 tkinterdnd2
+sv-ttk
