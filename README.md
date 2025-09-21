@@ -213,9 +213,9 @@ These steps are optional for development, but recommended for sharing executable
 
 <!-- Download link references -->
 
-[win-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/v0.0.3/Timetable.to.Calendar.ZJNU.exe
-[mac-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/v0.0.3/Timetable.to.Calendar.ZJNU.app.zip
-[linux-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/v0.0.3/timetable-to-calendar-zjnu.tar.gz
+[win-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/1.0.1/Timetable.to.Calendar.ZJNU.exe
+[mac-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/1.0.1/Timetable.to.Calendar.ZJNU.app.zip
+[linux-dl]: https://github.com/Al-rimi/Timetable-to-Calendar/releases/download/1.0.1/timetable-to-calendar-zjnu.tar.gz
 
 ## Debugging & Dev Tools
 
